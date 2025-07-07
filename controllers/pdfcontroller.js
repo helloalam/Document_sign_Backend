@@ -88,7 +88,7 @@ exports.signPDF = catchAsyncErrors(async (req, res) => {
 
   const selectedPage = pages[page - 1];
   const pageHeight = selectedPage.getHeight();
-  const correctedY = pageHeight - Number(y);
+  const correctedY = pageHeight - Number(y) - 5;
   const targetX = Number(x);
 
   if (type === "text") {
