@@ -74,7 +74,7 @@ exports.signPDF = catchAsyncErrors(async (req, res) => {
     return res.status(400).json({ message: "Base64 image required for image signature" });
   }
 
-
+  // ✅ Load PDF from Cloudinary URL
   const existingPdfBytes = await fetch(pdfUrl).then(res => {
     if (!res.ok) throw new Error(`Failed to fetch PDF: ${res.status}`);
     return res.arrayBuffer();
@@ -89,6 +89,7 @@ exports.signPDF = catchAsyncErrors(async (req, res) => {
 
   const selectedPage = pages[page - 1];
   const pageHeight = selectedPage.getHeight();
+
   const correctedY = pageHeight - Number(y) - 10;
   const targetX = Number(x);
 
@@ -102,13 +103,13 @@ exports.signPDF = catchAsyncErrors(async (req, res) => {
       color: rgb(0, 0, 0),
     });
   } else if (type === "image") {
+    // ✅ Only do this AFTER pdfDoc is created
     const image = await pdfDoc.embedPng(imageData);
-    const { width, height } = image.scale(0.5);
     selectedPage.drawImage(image, {
       x: targetX,
       y: correctedY,
-      width,
-      height,
+      width: 120,
+      height: 40,
     });
   }
 
@@ -152,7 +153,6 @@ exports.signPDF = catchAsyncErrors(async (req, res) => {
     public_id: uploadResult.public_id,
   });
 });
-
 // 3. Serve Local PDF
 exports.previewPDF = catchAsyncErrors((req, res) => {
   const file = req.query.file;
