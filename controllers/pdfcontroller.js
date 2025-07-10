@@ -53,7 +53,7 @@ exports.signPDF = catchAsyncErrors(async (req, res) => {
     text,
     fontSize = 12,
     fontFamily,
-    imageBase64,
+    imageData,
     x,
     y,
     page = 1,
@@ -70,9 +70,10 @@ exports.signPDF = catchAsyncErrors(async (req, res) => {
     return res.status(400).json({ message: "Text is required for text signature" });
   }
 
-  if (type === "image" && !imageBase64) {
+  if (type === "image" && !imageData) {
     return res.status(400).json({ message: "Base64 image required for image signature" });
   }
+
 
   const existingPdfBytes = await fetch(pdfUrl).then(res => {
     if (!res.ok) throw new Error(`Failed to fetch PDF: ${res.status}`);
@@ -101,7 +102,7 @@ exports.signPDF = catchAsyncErrors(async (req, res) => {
       color: rgb(0, 0, 0),
     });
   } else if (type === "image") {
-    const image = await pdfDoc.embedPng(imageBase64);
+    const image = await pdfDoc.embedPng(imageData);
     const { width, height } = image.scale(0.5);
     selectedPage.drawImage(image, {
       x: targetX,
