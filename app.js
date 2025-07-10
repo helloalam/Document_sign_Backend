@@ -1,17 +1,21 @@
 const express = require("express");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
+const dotenv = require("dotenv");
 const bodyParser = require("body-parser");
+
+dotenv.config();
 
 const app = express();
 
-// ✅ Allow both local and deployed frontend
+// ✅ Allowed frontend origins
 const allowedOrigins = [
   "http://localhost:3000",
-  "https://document-sign-frontend-tu6g.vercel.app"
+  "https://document-sign-frontend-tu6g.vercel.app" // replace with your real Vercel frontend if needed
 ];
 
-app.use(cors({
+// ✅ CORS options
+const corsOptions = {
   origin: function (origin, callback) {
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
@@ -19,23 +23,34 @@ app.use(cors({
       callback(new Error("CORS Not Allowed"));
     }
   },
-  credentials: true,
-}));
+  credentials: true, // for cookies / sessions
+};
 
-// Middleware
-app.use(express.json({ limit: "10mb" }));
-app.use(bodyParser.urlencoded({ limit: "10mb", extended: true }));
+// ✅ Middleware
+app.use(cors(corsOptions)); // <-- Must come before routes
+app.options("*", cors(corsOptions)); // <-- Handle preflight requests
+
 app.use(cookieParser());
+app.use(bodyParser.json({ limit: "10mb" }));
+app.use(bodyParser.urlencoded({ extended: true }));
 
-// Routes
-const userRoutes = require("./routes/userRoute");
-const pdfRoutes = require("./routes/pdfroutes");
+// ✅ Wake-up route for Render backend
+app.get("/api/v1/ping", (req, res) => {
+  res.status(200).send("Server awake");
+});
 
-app.use("/api/v1", userRoutes);
+// ✅ Import your routes
+const authRoutes = require("./routes/authRoutes");
+const pdfRoutes = require("./routes/pdfRoutes");
+
+// ✅ Use your routes
+app.use("/api/v1", authRoutes);
 app.use("/api/v1", pdfRoutes);
 
-// Error Handler
+// ✅ Global error handler (if any)
 const errorMiddleware = require("./middleware/error");
 app.use(errorMiddleware);
 
-module.exports = app;
+// ✅ Start server
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
