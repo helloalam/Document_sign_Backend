@@ -1,21 +1,17 @@
 const express = require("express");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
-const dotenv = require("dotenv");
 const bodyParser = require("body-parser");
-
-dotenv.config();
 
 const app = express();
 
-// ✅ Allowed frontend origins
+// ✅ Allow both local and deployed frontend
 const allowedOrigins = [
   "http://localhost:3000",
-  "https://document-sign-frontend-tu6g.vercel.app" // replace with your real Vercel frontend if needed
+  "https://document-sign-frontend-tu6g.vercel.app"
 ];
 
-// ✅ CORS options
-const corsOptions = {
+app.use(cors({
   origin: function (origin, callback) {
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
@@ -23,34 +19,23 @@ const corsOptions = {
       callback(new Error("CORS Not Allowed"));
     }
   },
-  credentials: true, // for cookies / sessions
-};
+  credentials: true,
+}));
 
-// ✅ Middleware
-app.use(cors(corsOptions)); // <-- Must come before routes
-app.options("*", cors(corsOptions)); // <-- Handle preflight requests
-
+// Middleware
+app.use(express.json({ limit: "10mb" }));
+app.use(bodyParser.urlencoded({ limit: "10mb", extended: true }));
 app.use(cookieParser());
-app.use(bodyParser.json({ limit: "10mb" }));
-app.use(bodyParser.urlencoded({ extended: true }));
 
-// ✅ Wake-up route for Render backend
-app.get("/api/v1/ping", (req, res) => {
-  res.status(200).send("Server awake");
-});
+// Routes
+const userRoutes = require("./routes/userRoute");
+const pdfRoutes = require("./routes/pdfroutes");
 
-// ✅ Import your routes
-const authRoutes = require("./routes/authRoutes");
-const pdfRoutes = require("./routes/pdfRoutes");
-
-// ✅ Use your routes
-app.use("/api/v1", authRoutes);
+app.use("/api/v1", userRoutes);
 app.use("/api/v1", pdfRoutes);
 
-// ✅ Global error handler (if any)
+// Error Handler
 const errorMiddleware = require("./middleware/error");
 app.use(errorMiddleware);
 
-// ✅ Start server
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+module.exports = app;
