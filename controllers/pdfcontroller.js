@@ -74,7 +74,7 @@ exports.signPDF = catchAsyncErrors(async (req, res) => {
     return res.status(400).json({ message: "Base64 image required for image signature" });
   }
 
-  // ✅ Load PDF from Cloudinary URL
+  // Load existing PDF from URL
   const existingPdfBytes = await fetch(pdfUrl).then(res => {
     if (!res.ok) throw new Error(`Failed to fetch PDF: ${res.status}`);
     return res.arrayBuffer();
@@ -103,16 +103,34 @@ exports.signPDF = catchAsyncErrors(async (req, res) => {
       color: rgb(0, 0, 0),
     });
   } else if (type === "image") {
-    // ✅ Only do this AFTER pdfDoc is created
-    const image = await pdfDoc.embedPng(imageData);
-    selectedPage.drawImage(image, {
-      x: targetX,
-      y: correctedY,
-      width: 120,
-      height: 40,
-    });
+    let image;
+
+    try {
+      // Detect image format and embed accordingly
+      if (imageData.startsWith("data:image/png")) {
+        image = await pdfDoc.embedPng(imageData);
+      } else if (
+        imageData.startsWith("data:image/jpeg") ||
+        imageData.startsWith("data:image/jpg")
+      ) {
+        image = await pdfDoc.embedJpg(imageData);
+      } else {
+        return res.status(400).json({ message: "Unsupported image format" });
+      }
+
+      selectedPage.drawImage(image, {
+        x: targetX,
+        y: correctedY,
+        width: 120,
+        height: 40,
+      });
+    } catch (err) {
+      console.error("🧨 Error embedding image:", err);
+      return res.status(500).json({ message: "Image embed failed", error: err.message });
+    }
   }
 
+  // Add status text at bottom
   const footerFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   selectedPage.drawText(`Status: ${status}`, {
     x: 50,
@@ -122,6 +140,7 @@ exports.signPDF = catchAsyncErrors(async (req, res) => {
     color: rgb(0.5, 0.5, 0.5),
   });
 
+  // Save signed PDF
   const signedBytes = await pdfDoc.save({ useObjectStreams: true });
 
   const signedFilename = `signed_${Date.now()}.pdf`;
@@ -135,6 +154,7 @@ exports.signPDF = catchAsyncErrors(async (req, res) => {
     timeout: 60000,
   });
 
+  // Save signature metadata to MongoDB
   await Signature.create({
     documentId,
     userId,
@@ -147,12 +167,14 @@ exports.signPDF = catchAsyncErrors(async (req, res) => {
     public_id: uploadResult.public_id,
   });
 
+  // Return success response
   res.status(200).json({
     success: true,
     signedUrl: uploadResult.secure_url,
     public_id: uploadResult.public_id,
   });
 });
+
 // 3. Serve Local PDF
 exports.previewPDF = catchAsyncErrors((req, res) => {
   const file = req.query.file;
