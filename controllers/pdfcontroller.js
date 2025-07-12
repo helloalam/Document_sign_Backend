@@ -200,7 +200,7 @@ exports.deletePDF = catchAsyncErrors(async (req, res) => {
 
   // ✅ Optional: Restrict deletion only to document owner (secure)
   const currentUserId = req.user.id;
-  const isOwner = documents.every((doc) => doc.userId === currentUserId);
+const isOwner = documents.every((doc) => doc.userId.toString() === currentUserId.toString());
 
   if (!isOwner) {
     return res.status(403).json({ success: false, message: "You are not allowed to delete this document" });
