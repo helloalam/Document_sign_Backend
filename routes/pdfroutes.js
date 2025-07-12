@@ -22,7 +22,7 @@ router.post("/pdf/sign/:id",isAuthenticatedUser, signPDF);
 router.get("/pdf/preview", previewPDF);
 
 // Delete signed file
-router.delete("/pdf/delete", deletePDF);
+router.delete("/pdf/delete/:documentId", isAuthenticatedUser, deletePDF);
 
 // Send via email
 router.post("/pdf/email", sendPDFEmail);

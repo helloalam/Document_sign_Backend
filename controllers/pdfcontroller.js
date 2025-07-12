@@ -184,16 +184,40 @@ exports.previewPDF = catchAsyncErrors((req, res) => {
 
 // 4. Delete from Cloudinary
 exports.deletePDF = catchAsyncErrors(async (req, res) => {
-  const { public_id } = req.body;
-  if (!public_id) return res.status(400).json({ message: "public_id is required" });
+  const { documentId } = req.params;
 
-  const result = await cloudinary.uploader.destroy(public_id, { resource_type: "raw" });
-
-  if (result.result !== "ok") {
-    return res.status(404).json({ success: false, message: "File not found or already deleted" });
+  if (!documentId) {
+    return res.status(400).json({ success: false, message: "documentId is required" });
   }
 
-  res.status(200).json({ success: true, message: "PDF deleted from Cloudinary" });
+  // 1. Find all entries with the documentId
+  const documents = await Signature.find({ documentId });
+
+  if (!documents.length) {
+    return res.status(404).json({ success: false, message: "Document not found" });
+  }
+
+  // 2. Delete files from Cloudinary
+  for (const doc of documents) {
+    if (doc.public_id) {
+      try {
+        const result = await cloudinary.uploader.destroy(doc.public_id, { resource_type: "raw" });
+        if (result.result !== "ok") {
+          console.warn(`Cloudinary deletion failed for: ${doc.public_id}`);
+        }
+      } catch (err) {
+        console.error(`Error deleting ${doc.public_id} from Cloudinary:`, err.message);
+      }
+    }
+  }
+
+  // 3. Delete from MongoDB
+  await Signature.deleteMany({ documentId });
+
+  return res.status(200).json({
+    success: true,
+    message: "Document deleted from MongoDB and Cloudinary",
+  });
 });
 
 // 5. Email Signed PDF
