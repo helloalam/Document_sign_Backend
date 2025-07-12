@@ -183,42 +183,55 @@ exports.previewPDF = catchAsyncErrors((req, res) => {
 });
 
 // 4. Delete from Cloudinary
+
 exports.deletePDF = catchAsyncErrors(async (req, res) => {
-  const { documentId } = req.params;
+  const documentId = decodeURIComponent(req.params.documentId);
 
   if (!documentId) {
-    return res.status(400).json({ success: false, message: "documentId is required" });
+    return res.status(400).json({ success: false, message: "Document ID is required" });
   }
 
-  // 1. Find all entries with the documentId
+  // Step 1: Find all entries for this documentId
   const documents = await Signature.find({ documentId });
 
   if (!documents.length) {
     return res.status(404).json({ success: false, message: "Document not found" });
   }
 
-  // 2. Delete files from Cloudinary
+  // ✅ Optional: Restrict deletion only to document owner (secure)
+  const currentUserId = req.user.id;
+  const isOwner = documents.every((doc) => doc.userId === currentUserId);
+
+  if (!isOwner) {
+    return res.status(403).json({ success: false, message: "You are not allowed to delete this document" });
+  }
+
+  // Step 2: Delete each file from Cloudinary
   for (const doc of documents) {
     if (doc.public_id) {
       try {
-        const result = await cloudinary.uploader.destroy(doc.public_id, { resource_type: "raw" });
+        const result = await cloudinary.uploader.destroy(doc.public_id, {
+          resource_type: "raw",
+        });
+
         if (result.result !== "ok") {
-          console.warn(`Cloudinary deletion failed for: ${doc.public_id}`);
+          console.warn("Cloudinary deletion failed:", result);
         }
       } catch (err) {
-        console.error(`Error deleting ${doc.public_id} from Cloudinary:`, err.message);
+        console.error("Cloudinary delete error:", err.message);
       }
     }
   }
 
-  // 3. Delete from MongoDB
+  // Step 3: Delete from MongoDB
   await Signature.deleteMany({ documentId });
 
   return res.status(200).json({
     success: true,
-    message: "Document deleted from MongoDB and Cloudinary",
+    message: "Document deleted successfully from Cloudinary and MongoDB",
   });
 });
+
 
 // 5. Email Signed PDF
 exports.sendPDFEmail = catchAsyncErrors(async (req, res) => {
